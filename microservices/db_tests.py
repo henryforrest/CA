@@ -1,17 +1,17 @@
 import pytest
-from db import app, db
+from db import db_app, db
 
 @pytest.fixture
 def client():
-    app.config["TESTING"] = True
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"  # Use in-memory DB for tests
-    with app.app_context():
+    db_app.config["TESTING"] = True
+    db_app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"  # Use in-memory DB for tests
+    with db_app.app_context():
         db.create_all()
-    client = app.test_client()
+    client = db_app.test_client()
 
     yield client  # Run tests
 
-    with app.app_context():
+    with db_app.app_context():
         db.drop_all()  # Clean up DB after tests
 
 

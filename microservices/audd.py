@@ -3,7 +3,7 @@ import requests
 import os
 from flask_sqlalchemy import SQLAlchemy
 
-app = Flask(__name__)
+audd_app = Flask(__name__)
 
 db_url = "http://127.0.0.1:5000"
 
@@ -11,7 +11,7 @@ API = "484e8b89aa10afdc5984f488781a2c0c"
 AUDIO_DIR = os.path.join(os.getcwd(), "audio_clips")  # Use relative path
 
 
-@app.route("/identify", methods=['POST'])
+@audd_app.route("/identify", methods=['POST'])
 def identify():
     if not request.is_json:
         return jsonify({"error": "Request must be in JSON format"}), 400
@@ -54,8 +54,8 @@ def identify():
 
 
 if __name__ == "__main__":
-    with app.app_context():
+    with audd_app.app_context():
         print("Microservice started")
     
     # Start the Flask microservice
-    app.run(debug=True, port=8080) # Runs on http://127.0.0.1:8080
+    audd_app.run(debug=True, port=8080) # Runs on http://127.0.0.1:8080

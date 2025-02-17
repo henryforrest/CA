@@ -1,16 +1,16 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy, SQLAlchemyError
 import os
 from datetime import datetime
 
-app = Flask(__name__)
+db_app = Flask(__name__)
 
 # Set the database file path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, 'shamzam.db')}"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db_app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, 'shamzam.db')}"
+db_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-db = SQLAlchemy(app)
+db = SQLAlchemy(db_app)
 
 # Define the Track model
 class Track(db.Model):
@@ -24,14 +24,18 @@ class Track(db.Model):
     
 
 
-@app.route("/tracks", methods=['GET'])
+@db_app.route("/tracks", methods=['GET'])
 def tracks():
-    tracks = Track.query.all()
-    track_list = [{"id": track.id, "title": track.title, "artist": track.artist} for track in tracks]
-    return jsonify(track_list)
+    with db_app.app_context():
+        try:
+            tracks = Track.query.all()
+            track_list = [{"id": track.id, "title": track.title, "artist": track.artist} for track in tracks]
+            return jsonify(track_list)
+        except SQLAlchemyError as e:
+            return jsonify({"error": "Database error"}), 500
 
 
-@app.route("/add_track", methods=['POST'])
+@db_app.route("/add_track", methods=['POST'])
 def add_track():
     if not request.is_json:
         return jsonify({"error": "Request must be in JSON format"}), 400
@@ -58,7 +62,7 @@ def add_track():
 
 
 
-@app.route("/remove_track", methods=['POST'])
+@db_app.route("/remove_track", methods=['POST'])
 def remove_track():
     data = request.get_json()
 
@@ -74,7 +78,7 @@ def remove_track():
     if not isinstance(artist, str) or not isinstance(title, str):
         return jsonify({"error": "'artist' and 'title' must be strings"}), 400
 
-    with app.app_context():
+    with db_app.app_context():
         try:
             track = db.session.execute(
                 db.select(Track).filter_by(artist=artist, title=title)
@@ -95,8 +99,8 @@ def remove_track():
 
 # Initialise the database
 if __name__ == "__main__":
-    with app.app_context():
+    with db_app.app_context():
         db.create_all()
         print("Database initialised with tracks table!")
 
-    app.run(debug=True)  # Runs on http://127.0.0.1:5000 by default
+    db_app.run(debug=True)  # Runs on http://127.0.0.1:5000 by default

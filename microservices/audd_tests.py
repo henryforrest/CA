@@ -2,13 +2,13 @@ import pytest
 import os
 import requests
 from unittest.mock import patch, MagicMock
-from microservice import app, AUDIO_DIR
+from audd import audd_app, AUDIO_DIR
 
 @pytest.fixture
 def client():
     """Flask test client setup."""
-    app.config["TESTING"] = True
-    client = app.test_client()
+    audd_app.config["TESTING"] = True
+    client = audd_app.test_client()
     yield client  # Run tests
 
 
