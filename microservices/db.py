@@ -105,7 +105,7 @@ def remove_track():
             
             cursor.execute("DELETE FROM tracks WHERE title = ? AND artist = ?", (title, artist))
             conn.commit()
-        return jsonify({"message": "Track successfully removed."}), 200  # return success message 
+        return jsonify({"message": "Track successfully removed.", "track": {"title": title, "artist": artist}}), 200  # return success message 
     except Exception as e:
         return jsonify({"error": "Error removing track from database"}), 500  # return error if database operation fails 
 
