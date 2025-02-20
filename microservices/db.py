@@ -1,106 +1,116 @@
 from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy, SQLAlchemyError
+import sqlite3
 import os
-from datetime import datetime
 
-db_app = Flask(__name__)
+app = Flask(__name__)
 
 # Set the database file path
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-db_app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(BASE_DIR, 'shamzam.db')}"
-db_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+DB_PATH = os.path.join(BASE_DIR, "shamzam.db")
 
-db = SQLAlchemy(db_app)
+# Function to initialize the database
+def init_db():
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS tracks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL
+            )
+        """)
+        conn.commit()
 
-# Define the Track model
-class Track(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(255), nullable=False)
-    artist = db.Column(db.String(255), nullable=False)
-
-
-    def __repr__(self):
-        return f"<Track {self.title} by {self.artist}>"
+@app.route("/tracks", methods=['GET'])
+def get_tracks():
+    """ Function to output a list of all the tracks currently in the database 
     
+    Does not take any JSON payload input 
+
+    Expected output is 200 and a list of tracks in the database with the title, and id 
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, title, artist FROM tracks")
+            tracks = cursor.fetchall()  # gather all the tracks from the database 
+            track_list = [{"id": row[0], "title": row[1], "artist": row[2]} for row in tracks]  # loop through tracks 
+        return jsonify(track_list)  # make the track list to a json format and return it 
+    except Exception as e:
+        return jsonify({"error": "Database error"}), 500
 
 
-@db_app.route("/tracks", methods=['GET'])
-def tracks():
-    with db_app.app_context():
-        try:
-            tracks = Track.query.all()
-            track_list = [{"id": track.id, "title": track.title, "artist": track.artist} for track in tracks]
-            return jsonify(track_list)
-        except SQLAlchemyError as e:
-            return jsonify({"error": "Database error"}), 500
-
-
-@db_app.route("/add_track", methods=['POST'])
+@app.route("/add_track", methods=['POST'])
 def add_track():
+    """ Function takes a json input of a track and adds it to the database 
+
+    expected JSON payload: {"title": "good 4 u", "artist": "Olivia Rodrigo"}
+    
+    expected output is 200 and 'Track added!'
+    """
     if not request.is_json:
-        return jsonify({"error": "Request must be in JSON format"}), 400
+        return jsonify({"error": "Request must be in JSON format"}), 400  # makes sure the request is in JSON format 
     
     data = request.get_json()
     artist = data.get("artist")
     title = data.get("title")
 
     if not artist or not title:
-        return jsonify({"error": "Missing title or artist"}), 400
+        return jsonify({"error": "Missing title or artist"}), 400  # makes sure both title and artist are present 
     if not isinstance(artist, str) or not isinstance(title, str):
-        return jsonify({"error": "'artist' and 'title' must be strings"}), 400
+        return jsonify({"error": "'artist' and 'title' must be strings"}), 400  # makes sure title and artist are strings
     
-    # Check if track already exists
-    existing_track = Track.query.filter_by(title=title, artist=artist).first()
-    if existing_track:
-        return jsonify({"error": "Track already exists"}), 409
-    
-    new_track = Track(title=title, artist=artist)
-    db.session.add(new_track)
-    db.session.commit()
-
-    return jsonify({"message": "Track added!", "track": {"title": new_track.title, "artist": new_track.artist}})
-
-
-
-@db_app.route("/remove_track", methods=['POST'])
-def remove_track():
-    data = request.get_json()
-
-
-    if not data:
-        return jsonify({"error": "Invalid JSON"}), 400
-    
-    artist = data.get("artist")
-    title = data.get("title")
-
-    if not artist or not title:
-        return jsonify({"error": "Missing 'artist' or 'title' field"}), 400
-    if not isinstance(artist, str) or not isinstance(title, str):
-        return jsonify({"error": "'artist' and 'title' must be strings"}), 400
-
-    with db_app.app_context():
-        try:
-            track = db.session.execute(
-                db.select(Track).filter_by(artist=artist, title=title)
-            ).scalar_one_or_none()
-
-            if not track:
-                return jsonify({"error": "Track not found"}), 404
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM tracks WHERE title = ? AND artist = ?", (title, artist))
+            existing_track = cursor.fetchone() #  check if the track already exists in the database 
+            if existing_track:
+                return jsonify({"error": "Track already exists"}), 409 # return error if track being added is already in database 
             
-            db.session.delete(track)
-            db.session.commit()
-
-            return jsonify({"message": f'Track {track} by artist {artist} sucessfully removed.'}), 200
-        except SQLAlchemyError as e: 
-            return jsonify({"error": "Error removing track from database"}), 500
-
+            cursor.execute("INSERT INTO tracks (title, artist) VALUES (?, ?)", (title, artist))
+            conn.commit()
+        return jsonify({"message": "Track added!", "track": {"title": title, "artist": artist}}), 200  # return success message with track info 
+    except Exception as e:
+        return jsonify({"error": "Database error"}), 500  # return error if database operation fails 
 
 
+@app.route("/remove_track", methods=['POST'])
+def remove_track():
+    """ Function takes a json input of a track and removes it from the database 
 
-# Initialise the database
+    expected JSON payload: {"title": "good 4 u", "artist": "Olivia Rodrigo"}
+
+    expected output is 200 and 'Track successfully removed.'
+    """
+    if not request.is_json:
+        return jsonify({"error": "Request must be in JSON format"}), 400  # makes sure the request is in JSON format 
+    
+    data = request.get_json()
+    artist = data.get("artist")
+    title = data.get("title")
+
+    if not artist or not title:
+        return jsonify({"error": "Missing title or artist"}), 400  # makes sure both title and artist are present 
+    if not isinstance(artist, str) or not isinstance(title, str):
+        return jsonify({"error": "'artist' and 'title' must be strings"}), 400   # makes sure title and artist are strings 
+    
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM tracks WHERE title = ? AND artist = ?", (title, artist))
+            track = cursor.fetchone()  # check if the track exists in the database 
+            if not track:
+                return jsonify({"error": "Track not found"}), 404  # return error if track is not found 
+            
+            cursor.execute("DELETE FROM tracks WHERE title = ? AND artist = ?", (title, artist))
+            conn.commit()
+        return jsonify({"message": "Track successfully removed."}), 200  # return success message 
+    except Exception as e:
+        return jsonify({"error": "Error removing track from database"}), 500  # return error if database operation fails 
+
+
 if __name__ == "__main__":
-    with db_app.app_context():
-        db.create_all()
-        print("Database initialised with tracks table!")
-
-    db_app.run(debug=True)  # Runs on http://127.0.0.1:5000 by default
+    init_db()
+    print("Database initialized with tracks table!")
+    app.run(debug=True)
