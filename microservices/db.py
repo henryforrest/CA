@@ -91,7 +91,7 @@ def remove_track():
             db.session.commit()
 
             return jsonify({"message": f'Track {track} by artist {artist} sucessfully removed.'}), 200
-        except Exception as e: # come back exception name 
+        except SQLAlchemyError as e: 
             return jsonify({"error": "Error removing track from database"}), 500
 
 

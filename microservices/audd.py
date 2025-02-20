@@ -2,13 +2,18 @@ from flask import Flask, request, jsonify
 import requests
 import os
 from flask_sqlalchemy import SQLAlchemy
+from dotenv import load_dotenv
 
 audd_app = Flask(__name__)
 
 db_url = "http://127.0.0.1:5000"
 
-API = "484e8b89aa10afdc5984f488781a2c0c"
-AUDIO_DIR = os.path.join(os.getcwd(), "audio_clips")  # Use relative path
+
+load_dotenv()
+
+api_key = os.getenv('API_KEY')
+
+AUDIO_DIR = os.path.join(os.getcwd()) 
 
 
 @audd_app.route("/identify", methods=['POST'])
