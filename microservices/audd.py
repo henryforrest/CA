@@ -12,6 +12,12 @@ load_dotenv()  # load the API key from the .env file
 
 API = os.getenv('API_KEY')  # assign API key to correct variable 
 
+if API is None:
+    API = os.environ.get("API_KEY")
+
+if API is None:
+    raise ValueError("No AUDD API key given")
+
 AUDIO_DIR = os.path.join(os.getcwd()) # get current working directory to add to filename when identifying track 
 
 
